@@ -1931,12 +1931,12 @@ app.use(cors());
 app.use(express.json());
 
 // Initialize Gemini AI
-const genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY);
+const genAI = new GoogleGenerativeAI("AIzaSyBEnIfY-I1kt2ICFOI4NBW0G3SEakTcDx8");
 const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
 
 // Initialize PostgreSQL connection
 const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
+  connectionString: "postgresql://neondb_owner:npg_2B6QXDatPwlp@ep-sparkling-lab-a15aax1d-pooler.ap-southeast-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require",
   ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
   max: 20,
   idleTimeoutMillis: 30000,
@@ -1962,17 +1962,9 @@ pool.connect()
 
 const FEATURE_SCHEMAS = {
   INSTAGRAM_ANALYZER: {
-    tables: ['scraoper_a', 'items', 'stores','pincode'],
+    tables: ['brands', 'products', 'store_inventory','zipcodes'],
     description: 'Instagram Analytics Database',
     contextInfo: `
-    Database Context:
-    - brands: Contains brand information (brand_id, brand_name, isactive)
-    - creators: Contains creator/influencer details (creator_id, name, isactive)  
-    - posts: Contains Instagram post data (post_id, brand_id, creator_id, caption, views, likes, comments, date_posted, last_update)
-    
-    Relationships:
-    - posts.brand_id → brands.brand_id (which brand the post is about)
-    - posts.creator_id → creators.creator_id (which creator made the post)
     `
   },
   MAIN_APP: {
@@ -2292,16 +2284,7 @@ ${dataString}
 ${vizContext}
 
 Instructions:
-1. Provide a natural, conversational answer as if you're talking to a marketing manager
-2. Start with a direct answer to their question
-3. Include key insights about creators, brands, engagement, or trends
-4. Use emojis thoughtfully (📸 for posts, 👤 for creators, 🏆 for top performers, 📊 for stats, 📈 for growth, 💬 for engagement)
-5. Format numbers with commas for readability (views, likes, comments)
-6. If there's a chart, mention it naturally in your response
-7. Keep it concise but informative - aim for 3-5 sentences unless the data requires more
-8. Don't mention SQL, databases, or technical details
-9. Focus on actionable insights for Instagram marketing
-
+use appropriate emojis to make it engaging (📊 for stats, 🏆 for leaders, 📈 for growth, etc.)
 Your response:`;
 
   try {
