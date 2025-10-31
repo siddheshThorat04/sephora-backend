@@ -2193,6 +2193,73 @@ async function executeSQL(sqlQuery) {
 
 // ============= AI-Powered Chart Detection =============
 
+// async function analyzeForVisualization(query, results, sqlQuery) {
+//   if (!results || results.length === 0) {
+//     return { shouldVisualize: false };
+//   }
+
+//   const columns = Object.keys(results[0]);
+//   const sampleData = results.slice(0, 5);
+  
+//   const columnTypes = columns.map(col => {
+//     const sampleValue = results[0][col];
+//     return {
+//       name: col,
+//       type: typeof sampleValue === 'number' ? 'numeric' : 
+//             sampleValue instanceof Date ? 'date' : 'text',
+//       sampleValues: sampleData.map(row => row[col]).slice(0, 3)
+//     };
+//   });
+
+//   const prompt = `You are a data visualization expert. Analyze this query and data to determine if a chart would be helpful.
+
+// User Query: "${query}"
+
+// SQL Query: ${sqlQuery}
+
+// Data Structure:
+// - Row Count: ${results.length}
+// - Columns: ${JSON.stringify(columnTypes, null, 2)}
+
+// Sample Data (first 3 rows):
+// ${JSON.stringify(sampleData, null, 2)}
+
+// Analyze and respond in this EXACT JSON format (no additional text):
+// {
+//   "shouldVisualize": true/false,
+//   "chartType": "bar" | "line" | "pie" | null,
+//   "reasoning": "brief explanation",
+//   "xAxis": "column name for x-axis or labels",
+//   "yAxis": "column name for y-axis or values"
+// }
+
+// Guidelines:
+// - Use BAR charts for: comparisons, rankings, top N queries, counts by category
+// - Use LINE charts for: time series, trends over time, sequential data
+// - Use PIE charts for: proportions, distributions, percentages, market share
+// - Set shouldVisualize to true if data shows meaningful patterns
+// - Set shouldVisualize to false if single value, detailed listings, or text-heavy results
+// - For xAxis: pick the categorical column (name, brand_name, creator name, etc.)
+// - For yAxis: pick the numeric column (views, likes, comments, sum, count, etc.)
+
+// Respond ONLY with valid JSON, no other text.`;
+
+//   try {
+//     const result = await model.generateContent(prompt);
+//     const response = await result.response;
+//     let analysisText = response.text().trim();
+    
+//     analysisText = analysisText.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+    
+//     const analysis = JSON.parse(analysisText);
+//     console.log('📊 Visualization Analysis:', analysis);
+    
+//     return analysis;
+//   } catch (error) {
+//     console.error('Error analyzing for visualization:', error);
+//     return { shouldVisualize: false };
+//   }
+// }
 async function analyzeForVisualization(query, results, sqlQuery) {
   if (!results || results.length === 0) {
     return { shouldVisualize: false };
@@ -2211,36 +2278,59 @@ async function analyzeForVisualization(query, results, sqlQuery) {
     };
   });
 
-  const prompt = `You are a data visualization expert. Analyze this query and data to determine if a chart would be helpful.
+  const prompt = `You are a data visualization expert specializing in inventory and analytics systems. Analyze if this query genuinely benefits from visualization.
 
 User Query: "${query}"
-
 SQL Query: ${sqlQuery}
-
 Data Structure:
 - Row Count: ${results.length}
 - Columns: ${JSON.stringify(columnTypes, null, 2)}
-
 Sample Data (first 3 rows):
 ${JSON.stringify(sampleData, null, 2)}
 
-Analyze and respond in this EXACT JSON format (no additional text):
+CRITICAL DECISION RULES - Only visualize when it adds real value:
+
+✅ VISUALIZE when query involves:
+- Comparisons across multiple items (top 5, ranking, which stores have most)
+- Aggregations with GROUP BY (sum, count, average per category)
+- Distribution analysis (stock levels across stores, brands by region)
+- Trend identification (if time-based data exists)
+- Multiple numeric values that benefit from visual comparison (>= 3 data points)
+
+❌ DO NOT VISUALIZE when query shows:
+- Single row results (one store, one product, one value)
+- Detailed item listings without aggregation (list of products, store addresses)
+- Simple yes/no answers or binary checks (is item in stock?)
+- Text-heavy results (descriptions, addresses, detailed info)
+- Lookup queries (find SKU, get store details, check availability at specific location)
+- Less than 3 data points (insufficient for meaningful chart)
+- Results are primarily for reading/reference, not comparison
+
+QUERY INTENT ANALYSIS:
+- "Show me", "list", "find", "what is", "get details" → Usually NO chart (informational)
+- "Compare", "top", "most", "least", "how many", "total", "distribution" → Usually YES chart (analytical)
+- Single product/store questions → NO chart
+- Multiple items comparison → YES chart
+
+Respond in this EXACT JSON format (no additional text):
 {
   "shouldVisualize": true/false,
   "chartType": "bar" | "line" | "pie" | null,
-  "reasoning": "brief explanation",
-  "xAxis": "column name for x-axis or labels",
-  "yAxis": "column name for y-axis or values"
+  "reasoning": "brief explanation of why chart is/isn't helpful here",
+  "xAxis": "column name for x-axis" or null,
+  "yAxis": "column name for y-axis" or null,
+  "confidence": "high" | "medium" | "low"
 }
 
-Guidelines:
-- Use BAR charts for: comparisons, rankings, top N queries, counts by category
-- Use LINE charts for: time series, trends over time, sequential data
-- Use PIE charts for: proportions, distributions, percentages, market share
-- Set shouldVisualize to true if data shows meaningful patterns
-- Set shouldVisualize to false if single value, detailed listings, or text-heavy results
-- For xAxis: pick the categorical column (name, brand_name, creator name, etc.)
-- For yAxis: pick the numeric column (views, likes, comments, sum, count, etc.)
+Chart Type Selection (only if shouldVisualize is true):
+- BAR: Comparisons, rankings, counts by category (most common for inventory)
+- LINE: Time series, sequential trends (date-based data)
+- PIE: Proportions when showing parts of a whole (limit to 5-7 categories max)
+
+Set confidence based on:
+- "high": Clear analytical query with good numeric data for comparison
+- "medium": Could go either way, but chart might help
+- "low": Borderline case, table probably better
 
 Respond ONLY with valid JSON, no other text.`;
 
@@ -2252,15 +2342,39 @@ Respond ONLY with valid JSON, no other text.`;
     analysisText = analysisText.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
     
     const analysis = JSON.parse(analysisText);
-    console.log('📊 Visualization Analysis:', analysis);
     
+    // Additional safety checks - override AI if data clearly isn't chart-worthy
+    if (results.length === 1) {
+      console.log('📊 Override: Single row result - no chart needed');
+      return { shouldVisualize: false, reasoning: 'Single row result - table view is clearer' };
+    }
+    
+    if (results.length < 3 && analysis.shouldVisualize) {
+      console.log('📊 Override: Too few data points for meaningful chart');
+      return { shouldVisualize: false, reasoning: 'Insufficient data points for visualization' };
+    }
+    
+    // Check if there's at least one numeric column for charting
+    const hasNumericData = columnTypes.some(col => col.type === 'numeric');
+    if (analysis.shouldVisualize && !hasNumericData) {
+      console.log('📊 Override: No numeric data available for chart');
+      return { shouldVisualize: false, reasoning: 'No numeric data to visualize' };
+    }
+    
+    // Only show chart if confidence is high or medium
+    if (analysis.confidence === 'low') {
+      console.log('📊 Low confidence in visualization benefit - skipping chart');
+      return { shouldVisualize: false, reasoning: analysis.reasoning };
+    }
+    
+    console.log('📊 Visualization Analysis:', analysis);
     return analysis;
+    
   } catch (error) {
     console.error('Error analyzing for visualization:', error);
     return { shouldVisualize: false };
   }
 }
-
 // ============= Enhanced Answer Generation =============
 
 async function generateIntelligentAnswer(rows, sqlQuery, originalQuery, visualizationPlan) {
