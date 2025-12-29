@@ -4191,8 +4191,8 @@ app.use(cors());
 app.use(express.json());
 
 // Initialize Gemini AI
-const genAI = new GoogleGenerativeAI("AIzaSyCXN8Iy3Snb_X8fwRZjhdkuzHIWonOqb_M");
-const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
+const genAI = new GoogleGenerativeAI("AIzaSyBMTzKFV5dpQTym_GH9nUp-U4Dc8Dylhfc");
+const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
 
 // Initialize PostgreSQL connection
 const pool = new Pool({
